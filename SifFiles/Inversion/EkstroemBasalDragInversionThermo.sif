@@ -1,0 +1,684 @@
+!check keywords warn
+
+! name of the run used for the outputs
+$name="BetaL1.0e1304KM10LIso20C"
+
+! Parametre de régularisation
+!$Lambda=1.0e09
+$Lambda=1.0e13
+
+!! in SI units, input in Kelvin
+$ function capacity(T) { _capacity=146.3+(7.253*T)}
+
+!! in SI units, input in Kelvin
+$ function conductivity(T)  { _conductivity=9.828*exp(-5.7E-03*T)}
+
+!some constants
+$yearinsec = 365.25*24*60*60
+$rhoi = 917.0/(1.0e6*yearinsec^2)  ! MPa - a - m
+$gravity = -9.81*yearinsec^2
+$rhow = 1028.0/(1.0e6*yearinsec^2)
+$n = 3.0
+$gravity = -9.8*yearinsec^2
+
+
+Header
+  Mesh DB "." "Mesh"
+  !Mesh DB "." "MMGMesh"
+End
+
+Constants
+  Water Density = Real $rhow
+  Gas Constant = Real 8.314 !Joule/mol x  K
+  ! For SeaSpring/SeaPressure
+End
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Simulation
+  Coordinate System  = Cartesian 3D
+  Simulation Type = Steady State
+
+! Internal extrusion
+  Extruded Mesh Levels=10
+
+
+  Output Intervals = 10 !10
+
+  Steady State Max Iterations = 400!400
+  Steady State Min Iterations = 1
+
+  Output File = "InvStokes4KM10LIso20C.result"
+  Post File = "InvStokes4KM10LIso20C.vtu"
+
+  Initialize Dirichlet Conditions = Logical False
+
+  max output level = 30
+End
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+! Main ice body
+! the ice
+Body 1
+  Name = "ice"
+  Equation = 1
+  Body Force = 1
+  Material = 1
+  Initial Condition = 1
+End
+
+! The upper surface
+Body 2
+  Name= "top free surface"
+  Equation = 2
+  Material = 1
+  Body Force = 2
+  Initial Condition = 2
+End
+
+! the lower surface
+Body 3
+  Name= "free surface sea/ice-shelf"
+  Equation = 3
+  Material = 1
+  Body Force = 3
+  Initial Condition = 3
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Initial Condition 1
+  Pressure = Real 0.0
+  Velocity 1 = Real 0.0
+  Velocity 2 = Real 0.0
+  Velocity 3 = Real 0.0
+
+  Adjoint 1 = Real 0.0
+  Adjoint 2 = Real 0.0
+  Adjoint 3 = Real 0.0
+  Adjoint 4 = Real 0.0
+End
+Initial Condition 2
+End
+Initial Condition 3
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Body Force 1
+  Flow BodyForce 1 = Real 0.0
+  Flow BodyForce 2 = Real 0.0
+  Flow BodyForce 3 = Real $gravity
+End
+
+Body Force 2
+End
+Body Force 3
+End
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!! ice material properties in MPa - m - a system
+Material 1
+	! Glen's flow law (using Glen)
+  Density = Real $rhoi
+!----------------
+! viscosity stuff
+!----------------
+  Viscosity Model = String "Glen"
+! Viscosity has to be set to a dummy value
+! to avoid warning output from Elmer
+  !Viscosity = Equals viscIni
+  Viscosity = Real 1.0
+  Glen Exponent = Real 3.0
+  Critical Shear Rate = Real 1.0e-10
+! Rate factors (Paterson value in MPa^-3a^-1)
+  Rate Factor 1 = Real 1.258e13
+  Rate Factor 2 = Real 6.046e28
+! these are in SI units - no problem, as long as
+! the gas constant also is
+  Activation Energy 1 = Real 60e3
+  Activation Energy 2 = Real 139e3
+  Glen Enhancement Factor = Real 0.25
+! the variable taken to evaluate the Arrhenius law
+! in general this should be the temperature relative
+! to pressure melting point. The suggestion below plugs
+! in the correct value obtained with TemperateIceSolver
+  !Temperature Field Variable = String "Temp Homologous"
+! the temperature to switch between the
+! two regimes in the flow law
+  Limit Temperature = Real -10.0
+! In case there is no temperature variable
+  Constant Temperature = Real -20.0
+  !Viscosity Model = String "power law"
+  Sea level = Real 0.0
+End
+
+Solver 1
+ ! This solver is intended to be used once before simulation to import data sets onto the FE mesh
+  Exec Solver = Before All
+  !Exec Solver = Before simulation
+
+  Equation = "ScatteredInter"
+
+  procedure = "Scattered2DDataInterpolator" "Scattered2DDataInterpolator"
+
+  !Bounding Box dx = Real 2.0e4
+  ! will take only the data points that are within Max/Min mesh corrdinates + the real Value
+  ! can be usefull in parallel if all the data are stored in one file
+  ! (Default) no bounding box
+
+  !CheckNaN = Logical False ! Default True; check is interpolation method gives NaN
+  CheckNaN = Logical True ! Default True; check is interpolation method gives NaN
+        ! By default replace NaN by nearest available value
+        ! We can replace NaNs by Real value with following flag
+  !Replace NaN by = Real -9999999
+	!!!!! NNI or linear (nn-c library)
+
+ ! Default Sibson interpolation
+  Variable 1 = String "GHF"
+  Variable 1 data file = File "DEM/GHF_Martos2017.xyz"
+	Variable 1 method = String "li"
+  Variable 2 = String "Zb"
+  Variable 2 data file = File "DEM/IceBottom.xyz"
+	!Variable 2 method = String "li"
+  Variable 3 = String "Bedrock"
+  Variable 3 data file = File "DEM/BedPlusBathyGrav.xyz"
+	!Variable 3 method = String "li"
+  Variable 4 = String "Zs"
+  Variable 4 data file = File "DEM/Surface.xyz"
+	!Variable 4 method = String "li"
+  Variable 5 = String "Vmag"
+  Variable 5 data file = File "DEM/Vmag.xyz"
+	!Variable 5 method = String "li"
+  Variable 6 = String "Vx"
+  Variable 6 data file = File "DEM/Vx.xyz"
+	!Variable 6 method = String "li"
+  Variable 7 = String "Vy"
+  Variable 7 data file = File "DEM/Vy.xyz"
+	!Variable 7 method = String "li"
+  Variable 8 = String "viscIni"
+  Variable 8 data file = File "DEM/VISC1e5.xyz"
+	!Variable 8 method = String "li"
+  Variable 9 = String "beta"
+  Variable 9 data file = File "DEM/BETA1e5.xyz"
+ End
+
+Solver 2
+  Exec Solver = Before simulation
+  Equation = Reader
+  Procedure = "GridDataReader" "GridDataReader"
+
+  !---- NOTE: File is case sensitive, String is not!
+  Filename = File "DEM/SurfTempInit.nc"
+  !Time Dim Name = String "time"
+  X Dim Name = String "x1"
+  Y Dim Name = String "y1"
+
+  !Time Var Name = String "time"
+  X Var Name = String "x1"
+  Y Var Name = String "y1"
+
+  !--- Interpolation variables
+  Epsilon X = Real 1.0e-2
+  Epsilon Y = Real 1.0e-2
+  Epsilon Time = Real 0.01
+
+  Interpolation Bias = Real 0.0
+  Interpolation Multiplier = Real 1.0
+
+  Is Time Counter = Logical True
+
+  Variable 1 = File "TempInit"
+
+  Enable Scaling = Logical False ! Scales the Elmer grid to match the NetCDF grid
+  Flow Solver Name = String "Flow Solution"
+  Flow Loads Name = String "Flow Solution Loads"
+End
+
+Solver 3
+  !Exec Solver = Never
+  Exec Solver = Before Simulation
+  Equation = "MapCoordinate"
+  Procedure = "StructuredMeshMapper" "StructuredMeshMapper"
+
+  Active Coordinate = Integer 3
+  Mesh Velocity Variable = String "dSdt"
+  Mesh Update Variable = String "dS"
+  Mesh Velocity First Zero = Logical True
+
+  Top Surface Variable Name = String "Zs"
+  Bottom Surface Variable Name = String "Zb"
+
+  Displacement Mode = Logical False
+  Correct Surface = Logical True
+  Minimum Height = Real 1.0
+  Flow Solver Name = String "Flow Solution"
+  Flow Loads Name = String "Flow Solution Loads"
+End
+
+Solver 4
+  !Exec Solver = Never
+  Exec Solver = Before Simulation
+  Equation = GroundedMaskIni
+  Procedure = "ElmerIceSolvers" "GroundedSolver"
+  Variable = GroundedMask
+  Variable DOFs = 1
+
+  Toler = Real 1.0e-3
+  Bedrock Variable = String "Bedrock"
+  Flow Solver Name = String "Flow Solution"
+  Flow Loads Name = String "Flow Solution Loads"
+End
+
+
+Solver 5
+  !Exec Solver = Never
+  Exec Solver = Before Simulation
+  Equation = "NormalVector"
+  Procedure = "ElmerIceSolvers" "ComputeNormalSolver"
+  Variable = String "Normal Vector"
+  Variable DOFs = 3
+
+  ComputeAll = Logical False
+  Optimize Bandwidth = Logical False
+  Flow Solver Name = String "Flow Solution"
+  Flow Loads Name = String "Flow Solution Loads"
+End
+
+Solver 6
+  !Exec Solver = Never
+  Exec Solver = Before Simulation
+  Equation = Fw
+  Procedure = "ElmerIceSolvers" "GetHydrostaticLoads"
+  Variable = Fw[Fwater:3]
+  Variable DOFs = 3
+  Flow Solver Name = String "Flow Solution"
+  Flow Loads Name = String "Flow Solution Loads"
+End
+
+Solver 7
+  !Exec Solver = Never
+  Equation = "Navier-Stokes"
+  !Linear System Solver = Direct
+  !Linear System Direct Method = umfpack
+
+  !Linear System Solver = Iterative
+  !Linear System Direct Method = UMFPACK
+	Optimize Bandwidth = Logical True
+  Linear System Solver = Direct
+  Linear System Direct Method = "mumps"
+	Mumps percentage increase working space = Integer 160
+  !Linear System Max Iterations = 1500
+  !Linear System Iterative Method = BiCGStab
+  !Linear System Iterative Method = GCR
+	!Linear System GCR Restart = 200
+  !Linear System Preconditioning = ILU1
+  !Linear System Convergence Tolerance = Real 1.0e-8
+  !Linear System Abort Not Converged = False
+  !Linear System Residual Output = 1
+
+! system self adjoint if Newton is used for the last iterations
+  Nonlinear System Max Iterations = Integer 15
+  Nonlinear System Convergence Tolerance  = Real 1.0e-5
+  !Nonlinear System Newton After Iterations = Integer 2
+  Nonlinear System Newton After Iterations = Integer 10
+  Nonlinear System Newton After Tolerance = Real 1.0e-03
+  !Nonlinear System Newton After Tolerance = Real 1.0e-03
+  Nonlinear System Relaxation Factor = Real 1.0
+
+  Nonlinear System Reset Newton = Logical True
+
+  Steady State Convergence Tolerance = Real 1.0e-12
+
+  !Stabilization Method = String Bubbles
+  Stabilization Method = Stabilized
+
+  Calculate Loads = Logical True
+  Exported Variable 14 = Flow Solution Loads[Stress Vector:3 CEQ Residual:1]
+
+
+  Exported Variable 1 = -dofs 1 "viscIni"
+  Exported Variable 2 = -dofs 1 "Beta"
+  Exported Variable 3 = -dofs 1 "DJDBeta"
+  Exported Variable 4 = -dofs 1 "CostValue"
+  Exported Variable 5 = -dofs 4 "Velocityb"
+  Exported Variable 6 = -dofs 1 "vx"
+  Exported Variable 7 = -dofs 1 "vy"
+  Exported Variable 8 = -dofs 1 "vmag"
+  Exported Variable 9 = -dofs 1 "Bedrock"
+  Exported Variable 10 = -dofs 1 "Zs"
+  Exported Variable 11 = -dofs 1 "Zb"
+  Exported Variable 12 = -dofs 1 "dSdt"
+  Exported Variable 13 = -dofs 1 "dS"
+  Exported Variable 15 = -dofs 1 "GHF"
+End
+!!! Compute Cost function
+!!!!!!!!   Has to be run before the Adjoint Solver as adjoint forcing is computed here !!!!!
+Solver 8
+
+  !Exec Solver = Never
+  Equation = "Cost"
+
+!!  Solver need to be associated => Define dumy variable
+  Variable = -nooutput "CostV"
+  Variable DOFs = 1
+
+  !procedure = "ElmerIceSolvers" "CostSolver_Adjoint"
+  procedure = "src/CostSolver_Adjoint" "CostSolver_Adjoint"
+
+
+  Cost Variable Name = String "CostValue"  ! Name of Cost Variable
+
+  Optimized Variable Name = String "Beta"  ! Name of Beta for Regularization
+  Lambda = Real  $Lambda                   ! Regularization Coef
+! save the cost as a function of iterations
+  Cost Filename = File "Cost_$name$.dat"
+  Flow Solver Name = String "Flow Solution"
+  Flow Loads Name = String "Flow Solution Loads"
+end
+
+!!!!  Adjoint Solution
+Solver 9
+  !Exec Solver = Never
+
+  Equation = "Adjoint"
+  Variable = Adjoint
+  Variable Dofs = 4
+
+  procedure = "ElmerIceSolvers" "AdjointSolver"
+
+!Name of the flow solution solver
+  Flow Solution Equation Name = string "Navier-Stokes"
+
+  Linear System Solver = Direct
+  Linear System Direct Method = mumps
+	mumps percentage increase working space = integer 1000
+  !Linear System Solver = Iterative
+  ! Linear System Iterative Method = GMRES
+  ! Linear System GMRES Restart = 100
+  ! Linear System Preconditioning= ILU0
+  ! Linear System Convergence Tolerance= 1.0e-08
+  ! Linear System Max Iterations = 2000
+  Flow Solver Name = String "Flow Solution"
+  Flow Loads Name = String "Flow Solution Loads"
+End
+
+
+!!!!!  Compute Derivative of Cost function / Beta
+Solver 10
+  !Exec Solver = Never
+  Equation = "DJDBeta"
+
+!!  Solver need to be associated => Define dumy variable
+  Variable = -nooutput "DJDB"
+  Variable DOFs = 1
+
+  procedure = "ElmerIceSolvers" "DJDBeta_Adjoint"
+
+  Flow Solution Name = String "Flow Solution"
+  Adjoint Solution Name = String "Adjoint"
+	FreeSlipShelves = Logical True
+  Optimized Variable Name = String "Beta"  ! Name of Beta variable
+  Gradient Variable Name = String "DJDBeta"   ! Name of gradient variable
+  PowerFormulation = Logical False
+  Beta2Formulation = Logical True        ! SlipCoef define as Beta^2
+
+  Lambda = Real  $Lambda                   ! Regularization Coef
+  Flow Solver Name = String "Flow Solution"
+  Flow Loads Name = String "Flow Solution Loads"
+end
+
+Solver 11
+  !Exec Solver = Never
+  Exec Solver = Before Simulation
+  Equation = "HeightDepth"
+  Procedure = "StructuredProjectToPlane" "StructuredProjectToPlane"
+  Active Coordinate = Integer 3
+  Dot Product Tolerance = Real 1.0e-3
+
+  Operator 1 = Depth
+  Operator 2 = Height
+! Export Zb on the Upper surface
+  Variable 3 = Zb
+  Operator 3 = Bottom
+  Flow Solver Name = String "Flow Solution"
+  Flow Loads Name = String "Flow Solution Loads"
+End
+
+!!!!! Optimization procedure
+Solver 12
+  !Exec Solver = Never
+  Equation = "Optimize_m1qn3"
+
+!!  Solver need to be associated => Define dumy variable
+  Variable = -nooutput "UB"
+  Variable DOFs = 1
+
+  procedure = "ElmerIceSolvers" "Optimize_m1qn3Parallel"
+
+	Mesh Independent = Logical True
+  Cost Variable Name = String "CostValue"
+  Optimized Variable Name = String "Beta"
+  Gradient Variable Name = String "DJDBeta"
+  gradient Norm File = String "GradientNormAdjoint_$name$.dat"
+
+
+! M1QN3 Parameters
+  M1QN3 dxmin = Real 1.0e-10
+  M1QN3 epsg = Real  1.0e-13 !1.e-5
+  M1QN3 niter = Integer 2000
+  M1QN3 nsim = Integer 2000
+  M1QN3 impres = Integer 5
+  M1QN3 DIS Mode = Logical False
+  M1QN3 df1 = Real 0.5
+  M1QN3 normtype = String "dfn"
+  M1QN3 OutputFile = File  "M1QN3_$name$.out"
+  M1QN3 ndz = Integer 20
+
+  Flow Solver Name = String "Flow Solution"
+  Flow Loads Name = String "Flow Solution Loads"
+end
+
+
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Equation 1
+  Active Solvers (8)= 1 2 3 5 7 8 9 11
+  Flow Solution Name = String "Flow Solution"
+  !Convection = String Computed
+  NS Convect= False
+End
+
+Equation 2
+ !Active Solvers (4)=  3 5 9 10
+  Flow Solution Name = String "Flow Solution"
+  !Convection = String Computed
+  !Flow Solution Name = String "Flow Solution"
+  NS Convect= False
+  !Convection = String Computed
+End
+
+Equation 3
+ Active Solvers (4)=  4 6 10 12
+  Flow Solution Name = String "Flow Solution"
+  NS Convect= False
+  !Convection = String Computed
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Boundary Condition 1
+  Name = "back"
+  Target Boundaries = 1
+  !Normal-Tangential Velocity = Logical True
+  !Normal-Tangential Adjoint = Logical True
+  Velocity 1 = Equals vx
+  Velocity 2 = Equals vy
+  !Slip Coefficient 1 = Real 1.0e20
+  !Slip Coefficient 2 = Real 1.0e20
+  !Velocity 2 = Real 0.0
+	!Velocity 3 = Real 0.0
+	!Velocity 3 Condition = Variable Height
+	!REAL MATC "0.5-tx"
+  !!Velocity 3 = Real 0.0
+  !Adjoint 1 = Real 0.0
+  !Adjoint 2 = Real 0.0
+	!Adjoint 3 = Real 0.0
+	!Adjoint 3 Condition = Variable Height
+	!REAL MATC "0.5-tx"
+  !Adjoint 3 = Real 0.0
+End
+
+Boundary Condition 2
+  Name = "Looking Downhill Right"
+  Target Boundaries = 2
+  !Normal-Tangential Velocity = Logical True
+  !Normal-Tangential Adjoint = Logical True
+  Velocity 1 = Equals vx
+  Velocity 2 = Equals vy
+  !Slip Coefficient 1 = Real 1.0e20
+  !Slip Coefficient 2 = Real 0.0
+  !Velocity 1 = Real 0.0
+	!Velocity 2 = Real 0.0
+	!Velocity 2 Condition = Variable Height
+	!REAL MATC "0.5-tx"
+
+	!Velocity 3 = Real 0.0
+	!Velocity 3 Condition = Variable Height
+	!REAL MATC "0.5-tx"
+	!Velocity 2 = Real 0.0
+	!Velocity 2 Condition = Variable Height
+	!	Real MATC "0.5-tx"
+  !Periodic BC Velocity 2 = Logical True
+  !Periodic BC Velocity 3 = Logical True
+  !Velocity 3 = Real 0.0
+  !Adjoint 1 = Real 0.0
+	!Adjoint 2 = Real 0.0
+	!Adjoint 2 Condition = Variable Height
+	!REAL MATC "0.5-tx"
+	!Adjoint 3 = Real 0.0
+	!Adjoint 3 Condition = Variable Height
+	!REAL MATC "0.5-tx"
+	!Adjoint 2 = Real 0.0
+	!Adjoint 3 = Real 0.0
+	!Adjoint 2 Condition = Variable Height
+	!	Real MATC "0.5-tx"
+  !Adjoint 2 = Real 0.0
+  !Adjoint 3 = Real 0.0
+ End
+
+!! BC Lateral Ice-Shelf (air or sea contact)
+Boundary Condition 3
+  Name = "front"
+  Target Boundaries = 3
+
+
+  External Pressure = Variable Coordinate 3
+     Real Procedure "ElmerIceUSF" "SeaPressure"
+
+  Compute Sea Pressure = Logical True
+  ComputeNormal = Logical False
+
+End
+
+Boundary Condition 4
+  Name = "Looking Downhill Right"
+  Target Boundaries = 4
+  !Normal-Tangential Velocity = Logical True
+  !Normal-Tangential Adjoint = Logical True
+  Velocity 1 = Equals vx
+  Velocity 2 = Equals vy
+  !Slip Coefficient 1 = Real 1.0e20
+  !Velocity 1 = Real 0.0
+	!Velocity 2 = Real 0.0
+	!Velocity 2 Condition = Variable Height
+	!REAL MATC "0.5-tx"
+
+	!Velocity 3 = Real 0.0
+	!Velocity 3 Condition = Variable Height
+	!REAL MATC "0.5-tx"
+  !Periodic BC Velocity 2 = Logical True
+  !Periodic BC Velocity 3 = Logical True
+  !Velocity 2 = Real 0.0
+  !Velocity 3 = Real 0.0
+  !Adjoint 1 = Real 0.0
+	!Adjoint 2 = Real 0.0
+	!Adjoint 2 Condition = Variable Height
+	!REAL MATC "0.5-tx"
+	!Adjoint 3 = Real 0.0
+	!Adjoint 3 Condition = Variable Height
+	!REAL MATC "0.5-tx"
+	!Adjoint 2 = Real 0.0
+	!Adjoint 3 = Real 0.0
+	!Adjoint 2 Condition = Variable Height
+	!	Real MATC "0.5-tx"
+  !Adjoint 2 = Real 0.0
+  !Adjoint 3 = Real 0.0
+End
+
+
+Boundary Condition 5
+  !Name = "bottom"
+  Name= "bed" !mandatory to compute regularistaion term of the cost function (int (dbeta/dx) 2)
+  Target Boundaries = 5
+  Body ID = Integer 3
+
+  Save Line = Logical True
+
+  Normal-Tangential Velocity = Logical True
+  Normal-Tangential Adjoint = Logical True
+
+  Adjoint Force BC = Logical True
+
+  Velocity 1 = Real 0.0e0
+  Adjoint 1 = Real 0.0e0
+
+  Slip Coefficient 2 = Variable Beta
+     REAL MATC "tx*tx"
+     !REAL MATC "10^tx(0)"
+
+  Slip Coefficient 3 = Variable Beta
+     REAL MATC "tx*tx"
+     !REAL MATC "10^tx(0)"
+			   !-------------------
+  !Normal-Tangential Velocity = Logical True
+  !Normal-Tangential Adjoint = Logical True
+
+  !Adjoint Force BC = Logical True
+  !Flow Force BC = Logical True
+
+!
+End
+
+! Upper Surface
+Boundary Condition 6
+  !Name= "Surface" mandatory to compute cost function
+  Name = "Surface"
+  Target Boundaries = 6
+  Body Id = 2
+
+  Save Line = Logical True
+
+  ! Definition of the Cost function
+  Adjoint Cost = Variable Velocity 1 , vx , Velocity 2 , vy, vmag, zb, bedrock
+    Real MATC "0.5*((tx(0)-tx(1))*(tx(0)-tx(1))+(tx(2)-tx(3))*(tx(2)-tx(3)))"
+    !Real MATC "if (tx(5)<= tx(6)) {0.0} else {0.5*((tx(0)-tx(1))*(tx(0)-tx(1))+(tx(2)-tx(3))*(tx(2)-tx(3)))}"
+    !Real MATC "if (tx(4)< 15) {0.0} else {0.5*((tx(0)-tx(1))*(tx(0)-tx(1))+(tx(2)-tx(3))*(tx(2)-tx(3)))}"
+
+  !  derivative of the cost function wr u and v
+  Adjoint Cost der 1 = Variable Velocity 1 , vx, vmag, zb, bedrock
+    Real MATC "tx(0)-tx(1)"
+    !Real MATC "if (tx(3) <= tx(4)) {0.0} else {tx(0)-tx(1)}"
+    !Real MATC "if (tx(2) < 15) {0.0} else {tx(0)-tx(1)}"
+    !Real MATC "if (tx(2)>10){tx(0)-tx(1)}"
+  Adjoint Cost der 2 = Variable Velocity 2 , vy, vmag, zb, bedrock
+    Real MATC "tx(0)-tx(1)"
+    !Real MATC "if (tx(3) <= tx(4)) {0.0} else {tx(0)-tx(1)}"
+	!Temp = Variable TempInit
+	!	Real MATC "tx(0)+273.15"
+    !REAL MATC "tx(0) + 273.15"
+    !Real MATC "tx(0)-tx(1)"
+    !Real MATC "if (tx(2) < 15) {0.0} else {tx(0)-tx(1)}"
+    !Real MATC "if (tx(2)>10){tx(0)-tx(1)}"
+
+End
+

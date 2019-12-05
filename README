@@ -1,0 +1,13 @@
+This repository has all files necessary to perform the Elmer/Ice simulations
+presented in Schannwell et al. "Glacial cycle ice-sheet evolution controlled by
+ocean bed properties".
+The Elmer/Ice input files for the initialisation
+(inversion) and for the forward simulations using the direct and iterative ice
+velocity setup can be found in SifFiles.
+
+The necessary input data can be found under InputData and all code userdefined
+code for the experiments is under src. Paths given in the SifFiles to the code
+files need to be adjusted. Also compilation of these function should be done
+with the same compiler as the main Elmer/Ice code compilation.
+
+Clemens Schannwell, November 5 2019
